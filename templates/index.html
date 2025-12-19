@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Course Grade Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .form-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .example {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 13px;
+            color: #495057;
+        }
+
+        .example-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+            font-family: Arial, sans-serif;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .instructions {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+        }
+
+        .instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin: 5px 0;
+        }
+
+        /* Preference Sliders Section */
+        .preferences-section {
+            background-color: #fff3cd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #ffc107;
+        }
+
+        .preferences-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .slider-container {
+            margin: 20px 0;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: normal;
+            font-size: 1em;
+        }
+
+        .slider-name {
+            color: #333;
+        }
+
+        .slider-value {
+            background-color: #007bff;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+            min-width: 45px;
+            text-align: center;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider-description {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .total-weight {
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #ee5555;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .total-weight.valid {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        button:disabled {
+            background: gray !important;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+    </style>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const gradeSlider = document.getElementById('weight-grade');
+            const rmpSlider = document.getElementById('weight-rmp');
+            const gpaSlider = document.getElementById('weight-gpa');
+
+            const gradeValue = document.getElementById('grade-value');
+            const rmpValue = document.getElementById('rmp-value');
+            const gpaValue = document.getElementById('gpa-value');
+
+            const totalPercent = document.getElementById('total-percent');
+            const totalWeight = document.getElementById('total-weight');
+            const submitBtn = document.getElementById('submitBtn');
+
+            function updateValues() {
+                const grade = parseInt(gradeSlider.value);
+                const rmp = parseInt(rmpSlider.value);
+                const gpa = parseInt(gpaSlider.value);
+                const total = grade + rmp + gpa;
+
+                gradeValue.textContent = grade + '%';
+                rmpValue.textContent = rmp + '%';
+                gpaValue.textContent = gpa + '%';
+                totalPercent.textContent = total;
+
+                if (total === 100) {
+                    totalWeight.classList.add('valid');
+                    submitBtn.disabled = false;
+                } else {
+                    totalWeight.classList.remove('valid');
+                    submitBtn.disabled = true;
+                }
+            }
+
+            gradeSlider.addEventListener('input', updateValues);
+            rmpSlider.addEventListener('input', updateValues);
+            gpaSlider.addEventListener('input', updateValues);
+
+            updateValues();
+        });
+    </script>
+
+
+
+</head>
+
+<body>
+    <h1>📊 Course Grade Analyzer</h1>
+    <p class="subtitle">Find the optimal course based on your preferences</p>
+
+    <div class="form-container">
+        <div class="instructions">
+            <strong>How to use:</strong>
+            <ul>
+                <li>Enter courses in format: <code>SUBJECT NUMBER</code></li>
+                <li>Separate multiple courses with commas</li>
+                <li>Can use "OR" between courses (optional)</li>
+                <li>Duplicates will be automatically removed</li>
+                <li>Adjust sliders below to set your priorities</li>
+            </ul>
+        </div>
+
+        <form method="POST">
+            <label for="courses">Enter Courses to Compare:</label>
+            <textarea name="courses" id="courses" placeholder="COMP SCI 407,412,425,435,471,475
+COMP SCI 536,537,538,539,540" required></textarea>
+
+            <div class="example">
+                <div class="example-title">Example input:</div>
+                COMP SCI 407,536 OR 538,537,542,544,552,557<br>
+                COMP SCI 564,640,642
+            </div>
+
+            <!-- Preference Sliders -->
+            <div class="preferences-section">
+                <h3>⚙️ Your Preferences (adjust importance)</h3>
+                <p style="font-size: 0.9em; color: #666;">Set how much each factor matters to you:</p>
+
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span class="slider-name">📈 Grade Distribution (A%)</span>
+                        <span class="slider-value" id="grade-value">50%</span>
+                    </div>
+                    <input type="range" name="weight_grade" id="weight-grade" min="0" max="100" step="10" value="50">
+                    <div class="slider-description">How important are high A percentages?</div>
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span class="slider-name">⭐ Professor Rating (RMP)</span>
+                        <span class="slider-value" id="rmp-value">30%</span>
+                    </div>
+                    <input type="range" name="weight_rmp" id="weight-rmp" min="0" max="100" step="10" value="30">
+                    <div class="slider-description">How important is professor quality/teaching?</div>
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span class="slider-name">📊 Overall GPA</span>
+                        <span class="slider-value" id="gpa-value">20%</span>
+                    </div>
+                    <input type="range" name="weight_gpa" id="weight-gpa" min="0" max="100" step="10" value="20">
+                    <div class="slider-description">How important is avoiding trick courses (all A's or all F's)?</div>
+                </div>
+
+                <div class="total-weight" id="total-weight">
+                    Total Weight: <span id="total-percent">100</span>%
+                </div>
+            </div>
+
+            <button id="submitBtn" type="submit" disabled>🔍 Analyze Courses</button>
+        </form>
+    </div>
+
+
+</body>
+
+</html>

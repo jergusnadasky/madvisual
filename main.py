@@ -53,15 +53,29 @@ def get_course_grades(uuid):
             cumulative = data.get("cumulative", {})
             if cumulative and cumulative.get("total", 0) > 0:
                 total = cumulative.get("total", 0)
+                a_count = cumulative.get("aCount", 0)
+                ab_count = cumulative.get("abCount", 0)
+                b_count = cumulative.get("bCount", 0)
+                bc_count = cumulative.get("bcCount", 0)
+                c_count = cumulative.get("cCount", 0)
+                d_count = cumulative.get("dCount", 0)
+                f_count = cumulative.get("fCount", 0)
+                
+                # Calculate GPA (A=4.0, AB=3.5, B=3.0, BC=2.5, C=2.0, D=1.0, F=0.0)
+                total_points = (a_count * 4.0 + ab_count * 3.5 + b_count * 3.0 + 
+                               bc_count * 2.5 + c_count * 2.0 + d_count * 1.0 + f_count * 0.0)
+                gpa = total_points / total if total > 0 else 0.0
+                
                 grades_data = {
                     "total": total,
-                    "a_percent": (cumulative.get("aCount", 0) / total) * 100,
-                    "ab_percent": (cumulative.get("abCount", 0) / total) * 100,
-                    "b_percent": (cumulative.get("bCount", 0) / total) * 100,
-                    "bc_percent": (cumulative.get("bcCount", 0) / total) * 100,
-                    "c_percent": (cumulative.get("cCount", 0) / total) * 100,
-                    "d_percent": (cumulative.get("dCount", 0) / total) * 100,
-                    "f_percent": (cumulative.get("fCount", 0) / total) * 100,
+                    "a_percent": (a_count / total) * 100,
+                    "ab_percent": (ab_count / total) * 100,
+                    "b_percent": (b_count / total) * 100,
+                    "bc_percent": (bc_count / total) * 100,
+                    "c_percent": (c_count / total) * 100,
+                    "d_percent": (d_count / total) * 100,
+                    "f_percent": (f_count / total) * 100,
+                    "gpa": gpa
                 }
                 return grades_data, None
             return {}, "No cumulative grade data available"
@@ -120,6 +134,9 @@ def process_single_course(subject, course_number):
         "uuid": None,
         "grades": {},
         "a_percent": 0.0,
+        "gpa": 0.0,
+        "rmp_rating": 3.0,  # Placeholder until we add RMP integration
+        "optimal_score": 0.0,
         "error": None
     }
     
@@ -134,6 +151,7 @@ def process_single_course(subject, course_number):
         
         if grades_data and grades_data.get("total", 0) > 0:
             course_data["a_percent"] = grades_data["a_percent"]
+            course_data["gpa"] = grades_data.get("gpa", 0.0)
         else:
             course_data["error"] = grades_error or "No cumulative grade data available (treated as 0% A's)"
     else:
@@ -141,11 +159,45 @@ def process_single_course(subject, course_number):
     
     return course_data
 
+def calculate_optimal_score(a_percent, rmp_rating, gpa, weight_grade, weight_rmp, weight_gpa):
+    """Calculate weighted optimal score (0-100 scale)"""
+    # Normalize each metric to 0-100 scale
+    a_score = a_percent  # already 0-100
+    rmp_score = (rmp_rating / 5.0) * 100  # RMP is 0-5, convert to 0-100
+    gpa_score = (gpa / 4.0) * 100  # GPA is 0-4, convert to 0-100
+    
+    # Weighted average
+    optimal_score = (a_score * weight_grade) + (rmp_score * weight_rmp) + (gpa_score * weight_gpa)
+    return optimal_score
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
         courses_input = request.form["courses"]
         parsed_courses = parse_courses(courses_input)
+        
+        # Get user preference weights (normalize to ensure they sum to 1.0)
+        weight_grade = float(request.form.get("weight_grade", 50))
+        weight_rmp = float(request.form.get("weight_rmp", 30))
+        weight_gpa = float(request.form.get("weight_gpa", 20))
+        total_weight = weight_grade + weight_rmp + weight_gpa
+        
+        if total_weight != 100:
+            return render_template(
+                "index.html",
+                error="Total weight must equal 100%. Please adjust your sliders.",
+             )
+
+        
+        # Normalize weights
+        if total_weight > 0:
+            weight_grade /= total_weight
+            weight_rmp /= total_weight
+            weight_gpa /= total_weight
+        else:
+            weight_grade, weight_rmp, weight_gpa = 0.5, 0.3, 0.2
+        
+        print(f"User weights: Grade={weight_grade:.2f}, RMP={weight_rmp:.2f}, GPA={weight_gpa:.2f}")
         
         # Process courses concurrently with ThreadPoolExecutor
         courses = []
@@ -174,8 +226,19 @@ def index():
                         "error": f"Processing error: {str(e)}"
                     })
         
-        # Sort courses by A percentage (highest first)
-        courses.sort(key=lambda c: c["a_percent"], reverse=True)
+        # Calculate optimal scores for each course
+        for course in courses:
+            course["optimal_score"] = calculate_optimal_score(
+                course["a_percent"],
+                course["rmp_rating"],
+                course["gpa"],
+                weight_grade,
+                weight_rmp,
+                weight_gpa
+            )
+        
+        # Sort courses by optimal score (highest first)
+        courses.sort(key=lambda c: c["optimal_score"], reverse=True)
         
         # Recommendation
         if courses:
@@ -183,8 +246,8 @@ def index():
             recommendation = f"{best_course['subject']} {best_course['number']}"
             if best_course['name']:
                 recommendation += f" - {best_course['name']}"
-            recommendation += f" ({best_course['a_percent']:.2f}% A's)"
-            if best_course["a_percent"] == 0:
+            recommendation += f" (Score: {best_course['optimal_score']:.1f}/100)"
+            if best_course["optimal_score"] == 0:
                 recommendation += " (All courses lack data; consider manual review)"
         else:
             recommendation = "No courses provided."
@@ -196,7 +259,10 @@ def index():
                 "rank": rank,
                 "course": f"{c['subject']} {c['number']}",
                 "name": c['name'] or "Unknown",
+                "optimal_score": f"{c['optimal_score']:.1f}",
                 "a_percent": f"{c['a_percent']:.2f}%",
+                "gpa": f"{c['gpa']:.2f}",
+                "rmp_rating": f"{c['rmp_rating']:.1f}/5.0",
                 "ab_percent": f"{c['grades'].get('ab_percent', 0):.2f}%" if c['grades'] else "0.00%",
                 "b_percent": f"{c['grades'].get('b_percent', 0):.2f}%" if c['grades'] else "0.00%",
                 "bc_percent": f"{c['grades'].get('bc_percent', 0):.2f}%" if c['grades'] else "0.00%",
